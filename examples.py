@@ -6,7 +6,7 @@ import requests
 import zipfile
 import io
 import json
-import pathlib as path
+from pathlib import Path
 
 from sklearn import datasets, ensemble, model_selection
 from scipy.stats import anderson_ksamp
@@ -50,14 +50,12 @@ def _process_data(raw_data: pd.DataFrame) -> pd.DataFrame:
 
 # load data
 raw_data = _process_data(_fetch_data())
-print(raw_data.head())
 
 # Feature selection
 target = 'cnt'
 prediction = 'prediction'
 numerical_features = ['temp', 'atemp', 'hum', 'windspeed', 'mnth', 'hr', 'weekday']
 categorical_features = ['season', 'holiday', 'workingday']
-
 
 # like the purposel of the exam
 def make_column_mapping(
@@ -67,15 +65,21 @@ def make_column_mapping(
         categorical_features: list[str]
 ):
     column_mapping = ColumnMapping()
-    column_mapping.target = target,
-    column_mapping.prediction = prediction,
-    column_mapping.numerical_features = numerical_features,
-    column_mapping.categorical_features = categorical_features,
+    column_mapping.target = target
+    column_mapping.prediction = prediction
+    column_mapping.numerical_features = numerical_features
+    column_mapping.categorical_features = categorical_features
     return column_mapping
 
+def save_report(report: Report, name: str):
+    out = REPORTS_DIR / f"{name}.html"
+    report.save_html(out)
 
-REPORTS_DIR = path("reports")
+REPORTS_DIR = Path("reports")
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+
 
 
 
@@ -83,6 +87,8 @@ def main():
     # Reference and current data splitpip show evidently
     reference_jan11 = raw_data.loc['2011-01-01 00:00:00':'2011-01-28 23:00:00']
     current_feb11 = raw_data.loc['2011-01-29 00:00:00':'2011-02-28 23:00:00']
+
+
 
     X = reference_jan11[numerical_features + categorical_features]
     y = reference_jan11[target]
@@ -117,54 +123,67 @@ def main():
 
     # # Initialize the column mapping object, which is evidently used to know how the data is structured. 
     column_mapping = make_column_mapping(
-        target=target,
-        prediction=prediction,
+        target='target',
+        prediction='prediction',
         numerical_features=numerical_features,
         categorical_features=categorical_features
     )
 
-
-
     regression_performance_report = Report(metrics=[
         RegressionPreset(),
     ])
 
-    # Run the regression performance report using the training data as reference and test data as current
-    # The data is sorted by index to ensure consistent ordering for the comparison
+
+
     regression_performance_report.run(reference_data=X_train_df.sort_index(), 
                                     current_data=X_test_df.sort_index(),
                                     column_mapping=column_mapping)
 
+    print(column_mapping.prediction)
+    print(column_mapping.numerical_features)
+    print(column_mapping.categorical_features)
+    print(column_mapping.target)
 
-    # Train the production model
-    regressor.fit(reference_jan11[numerical_features + categorical_features], reference_jan11[target])
+    save_report(regression_performance_report, "02_production_january")
 
-    # # Perform column mapping
-    # column_mapping = ColumnMapping()
-    # column_mapping.target = target
-    # column_mapping.prediction = prediction
-    # column_mapping.numerical_features = numerical_features
-    # column_mapping.categorical_features = categorical_features
 
-    # Generate predictions for the reference data
-    ref_prediction = regressor.predict(reference_jan11[numerical_features + categorical_features])
-    reference_jan11['prediction'] = ref_prediction
+    # print(column_mapping.prediction)
+    # print(column_mapping.numerical_features)
 
-    # Initialize the regression performance report with the default regression metrics preset
-    regression_performance_report = Report(metrics=[
-        RegressionPreset(),
-    ])
+    # Run the regression performance report using the training data as reference and test data as current
+    # The data is sorted by index to ensure consistent ordering for the comparison
 
-    # Run the regression performance report using the reference data
-    regression_performance_report.run(reference_data=None, 
-                                    current_data=reference_jan11,
-                                    column_mapping=column_mapping)
+
+
+    # # Train the production model
+    # regressor.fit(
+    #     current_feb11[numerical_features + categorical_features],
+    #     current_feb11[target]
+    #     )
+
+
+    # # Generate predictions for the reference data
+    # ref_prediction = regressor.predict(reference_jan11[numerical_features + categorical_features])
+    # reference_jan11['prediction'] = ref_prediction
+
+    # # Initialize the regression performance report with the default regression metrics preset
+    # regression_performance_report = Report(metrics=[
+    #     RegressionPreset(),
+    # ])
+
+    # # Run the regression performance report using the reference data
+    # regression_performance_report.run(reference_data=None, 
+    #                                 current_data=reference_jan11,
+    #                                 column_mapping=column_mapping)
     
 
 
-    data_drift_report = Report(metrics=[
-        DataDriftPreset(),
-    ])
+    # data_drift_report = Report(metrics=[
+    #     DataDriftPreset(),
+    # ])
+
+
+
 
     # data_drift_report.run(
     #     reference_data=reference_jan11,
