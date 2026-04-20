@@ -28,11 +28,22 @@ def _fetch_data() -> pd.DataFrame:
     content = requests.get(URL, verify=False).content
 
     with zipfile.ZipFile(io.BytesIO(content)) as arc:
-        raw_data = pd.read_csv(arc.open("hour.csv"), header=0, sep=',', parse_dates=['dteday']) 
+        raw_data = pd.read_csv(
+            arc.open("hour.csv"),
+            header=0,
+            sep=',',
+            parse_dates=['dteday']
+    ) 
     return raw_data
 
 def _process_data(raw_data: pd.DataFrame) -> pd.DataFrame:
-    raw_data.index = raw_data.apply(lambda row: datetime.datetime.combine(row.dteday.date(), datetime.time(row.hr)), axis=1)
+    raw_data.index = raw_data.apply(
+        lambda row: datetime.datetime.combine(
+            row.dteday.date(),
+            datetime.time(row.hr)
+            ),
+            axis=1
+        )
     return raw_data
 
 
@@ -49,7 +60,7 @@ categorical_features = ['season', 'holiday', 'workingday']
 
 
 # like the purposel of the exam
-def column_mapping(
+def make_column_mapping(
         target: str,
         prediction: str,
         numerical_features: list[str],
@@ -68,16 +79,18 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 
-
 def main():
     # Reference and current data splitpip show evidently
     reference_jan11 = raw_data.loc['2011-01-01 00:00:00':'2011-01-28 23:00:00']
     current_feb11 = raw_data.loc['2011-01-29 00:00:00':'2011-02-28 23:00:00']
 
+    X = reference_jan11[numerical_features + categorical_features]
+    y = reference_jan11[target]
+
     # Train test split ONLY on reference_jan11
     X_train, X_test, y_train, y_test = model_selection.train_test_split(
-        reference_jan11[numerical_features + categorical_features],
-        reference_jan11[target],
+        X,
+        y,
         test_size=0.3,
         random_state=42
     )
@@ -93,33 +106,33 @@ def main():
 
     # Add actual target and prediction columns to the training data for later performance analysis
     # mk gets shaped back with y component and adds preds with another Column"
-    X_train['target'] = y_train    # in former file als 'cnt
-    X_train['prediction'] = preds_train
+    X_train_df = X_train.copy()  
+    X_train_df['target'] = y_train    # in former file als 'cnt
+    X_train_df['prediction'] = preds_train
 
     # Add actual target and prediction columns to the test data for later performance analysis
-    X_test['target'] = y_test
-    X_test['prediction'] = preds_test
+    X_test_df = X_test.copy()
+    X_test_df['target'] = y_test
+    X_test_df['prediction'] = preds_test
 
     # # Initialize the column mapping object, which is evidently used to know how the data is structured. 
-    column_mapping = ColumnMapping()
+    column_mapping = make_column_mapping(
+        target=target,
+        prediction=prediction,
+        numerical_features=numerical_features,
+        categorical_features=categorical_features
+    )
 
-    # # Map the actual target and prediction column names in the dataset for evidently
-    # column_mapping.target = 'target'
-    # column_mapping.prediction = 'prediction'
 
-    # # Specify which features are numerical and which are categorical for the evidently report
-    # column_mapping.numerical_features = numerical_features
-    # column_mapping.categorical_features = categorical_features
 
-    # Initialize the regression performance report with the default regression metrics preset
     regression_performance_report = Report(metrics=[
         RegressionPreset(),
     ])
 
     # Run the regression performance report using the training data as reference and test data as current
     # The data is sorted by index to ensure consistent ordering for the comparison
-    regression_performance_report.run(reference_data=X_train.sort_index(), 
-                                    current_data=X_test.sort_index(),
+    regression_performance_report.run(reference_data=X_train_df.sort_index(), 
+                                    current_data=X_test_df.sort_index(),
                                     column_mapping=column_mapping)
 
 
@@ -153,12 +166,12 @@ def main():
         DataDriftPreset(),
     ])
 
-    data_drift_report.run(
-        reference_data=reference_jan11,
-        current_data=current_feb11.loc['2011-02-14 00:00:00':'2011-02-21 23:00:00'],
-        column_mapping=column_mapping_drift,
-    )
-    save_report(prod_reg_report, "02_production_january")
+    # data_drift_report.run(
+    #     reference_data=reference_jan11,
+    #     current_data=current_feb11.loc['2011-02-14 00:00:00':'2011-02-21 23:00:00'],
+    #     column_mapping=column_mapping_drift,
+    # )
+    # save_report(prod_reg_report, "02_production_january")
 
 if __name__ == "__main__":
     main()
