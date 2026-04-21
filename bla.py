@@ -1,4 +1,3 @@
-
 """
 Bike-Sharing Drift Monitoring — Evidently Exam
 ================================================
@@ -279,7 +278,7 @@ def main() -> None:
     # STEP 6 — Data drift report: week 3, numerical features only
     # ------------------------------------------------------------------
     print("\n[7/7] Step 6 — Data drift report (week 3, numerical only)...")
-
+_
     week3_start, week3_end = WEEKS["week3"]
     week3_data = current_feb11.loc[week3_start:week3_end].copy()
     week3_data[PREDICTION] = regressor.predict(
